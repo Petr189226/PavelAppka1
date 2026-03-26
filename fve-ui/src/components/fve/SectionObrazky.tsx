@@ -37,8 +37,7 @@ export function SectionObrazky() {
               />
             </FormField>
             <CardDescription>
-              Když obrázky nenahraješ, E-03 se vygeneruje s jednoduchým obdélníkovým půdorysem. Obrázky se ukládají i do JSON
-              projektu.
+              Když obrázky nenahraješ, E-03 se vygeneruje s jednoduchým obdélníkovým půdorysem.
             </CardDescription>
           </CardContent>
         </Card>
@@ -53,7 +52,6 @@ export function SectionObrazky() {
               <li>U řad nastav počet panelů, azimut, sklon a pozici pro E-03.</li>
               <li>Klikni na „Přepočítat a připravit výstupy“.</li>
               <li>Otevři E-01, E-02 a E-03 do nového okna a ulož přes tisk do PDF.</li>
-              <li>Volitelně si projekt ulož do JSON a příště ho znovu načti.</li>
             </ol>
           </CardContent>
         </Card>

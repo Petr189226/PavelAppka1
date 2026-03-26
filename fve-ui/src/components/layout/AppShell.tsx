@@ -1,7 +1,7 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { FileJson, Layers, LayoutDashboard } from "lucide-react";
+import { Layers, LayoutDashboard } from "lucide-react";
 import type { ReactNode } from "react";
 
 const nav = [
@@ -48,15 +48,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="mt-6 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs leading-relaxed text-zinc-400">
             <div className="flex items-start gap-2 text-zinc-200">
               <LayoutDashboard className="mt-0.5 size-4 shrink-0 text-[#e85d5d]" />
-              <span>Jeden formulář → tři dokumenty, JSON záloha, vlastní logo a mapka.</span>
+              <span>Jeden formulář → tři dokumenty, vlastní logo a mapka.</span>
             </div>
             <div className="flex items-start gap-2">
               <Layers className="mt-0.5 size-4 shrink-0 text-zinc-500" />
               <span>Výstupy jsou projektové podklady – vždy ověřit jištění a distributora.</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <FileJson className="mt-0.5 size-4 shrink-0 text-zinc-500" />
-              <span>Ulož stav přes „Uložit JSON“ a načti znovu před úpravami.</span>
             </div>
           </div>
         </ScrollArea>
@@ -72,20 +68,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               Přepočítat a připravit výstupy
             </button>
-            <button
-              type="button"
-              id="btnSaveJson"
-              className="inline-flex h-9 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-emerald-600/90"
-            >
-              Uložit JSON
-            </button>
-            <label
-              htmlFor="loadJsonInput"
-              className="inline-flex h-9 cursor-pointer items-center justify-center rounded-xl border border-input bg-background px-4 text-sm font-medium shadow-sm hover:bg-accent"
-            >
-              Načíst JSON
-            </label>
-            <input id="loadJsonInput" type="file" accept="application/json" hidden />
             <button
               type="button"
               id="btnCopyPrompt"

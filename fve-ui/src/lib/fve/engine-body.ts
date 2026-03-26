@@ -3488,26 +3488,6 @@ ${data.companyName}`, 18).slice(0, 4);
       generatePrompt();
       status('Výstupy jsou připravené.');
     });
-    $('btnSaveJson').addEventListener('click', () => {
-      const data = gatherData();
-      downloadText(`${data.projectNumber || 'projekt'}_fve.json`, makeProjectJson(data), 'application/json;charset=utf-8');
-      status('Projekt byl uložen do JSON.');
-    });
-    $('loadJsonInput').addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const obj = JSON.parse(text);
-        applyProjectData(obj);
-        status('Projekt byl načten z JSON.');
-      } catch (err) {
-        console.error(err);
-        status('Načtení JSON se nepodařilo.', false);
-      } finally {
-        e.target.value = '';
-      }
-    });
     $('btnCopyPrompt').addEventListener('click', copyPrompt);
     $('btnReset').addEventListener('click', () => {
       loadDefaults();
@@ -3573,7 +3553,7 @@ ${data.companyName}`, 18).slice(0, 4);
     });
 
     document.querySelectorAll('#fve-app-root input, #fve-app-root select, #fve-app-root textarea').forEach(el => {
-      if (['logoUpload', 'roofUpload', 'mapUpload', 'sketchUpload', 'sourceFormUpload', 'loadJsonInput', 'changeCommands'].includes(el.id)) return;
+      if (['logoUpload', 'roofUpload', 'mapUpload', 'sketchUpload', 'sourceFormUpload', 'changeCommands'].includes(el.id)) return;
       el.addEventListener('input', () => {
         updateSummary();
         generatePrompt();
