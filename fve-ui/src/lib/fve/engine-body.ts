@@ -380,9 +380,8 @@ const state = {
   }
 
 
-  async function extractPdfStructuredFromFile(file) {
+  async function extractPdfStructuredFromBuffer(buffer) {
     const pdfjsLib = await ensurePdfJs();
-    const buffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buffer, disableWorker: true }).promise;
 
     function joinLineItemsLoose(items) {
@@ -468,6 +467,117 @@ const state = {
       text: normalizeFormText(pageTexts.join('\n\n')),
       pages
     };
+  }
+
+  async function extractPdfStructuredFromFile(file) {
+    return extractPdfStructuredFromBuffer(await file.arrayBuffer());
+  }
+
+  /**
+   * Vyplnitelná pole (AcroForm) u stejné šablony PDF — stabilní názvy polí, mění se jen hodnoty.
+   * Když PDF pole nemá, vrátí se prázdný objekt a stačí textová extrakce.
+   */
+  async function extractPdfAcroFormFieldMap(buffer) {
+    const pdfjsLib = await ensurePdfJs();
+    const pdf = await pdfjsLib.getDocument({ data: buffer, disableWorker: true }).promise;
+    const map = Object.create(null);
+    const pages = pdf.numPages || 0;
+    for (let p = 1; p <= pages; p += 1) {
+      const page = await pdf.getPage(p);
+      let annotations = [];
+      try {
+        annotations = await page.getAnnotations({ intent: 'display' });
+      } catch (_) {
+        try {
+          annotations = await page.getAnnotations();
+        } catch (_) {
+          annotations = [];
+        }
+      }
+      for (const ann of annotations || []) {
+        if (!ann || ann.subtype !== 'Widget') continue;
+        const name = String(ann.fieldName || ann.id || '').trim();
+        if (!name) continue;
+        let val = ann.fieldValue;
+        if (val == null || val === '') {
+          if (ann.buttonValue != null && ann.buttonValue !== '') val = ann.buttonValue;
+        }
+        if (val == null || val === '') continue;
+        const str = String(val).replace(/\r/g, '').trim();
+        if (!str) continue;
+        const lower = str.toLowerCase();
+        if (lower === 'off' || lower === 'no' || lower === 'ne') continue;
+        map[name] = str;
+      }
+    }
+    return map;
+  }
+
+  /**
+   * Heuristické mapování interních jmen polí PDF → intake* (jedna šablona, různá data).
+   * Každé PDF pole použijeme nejvýše jednou (nejdelší shoda hintu vyhrává).
+   */
+  function mapAcroFormToIntakeFields(acroMap) {
+    const entries = Object.entries(acroMap || {});
+    if (!entries.length) return {};
+    const used = new Set();
+    const out = {};
+    const matchers = [
+      ['intakeApplicantName', ['jmeno a prijmeni nazev', 'jmeno prijmeni nazev', 'jmenoaprijmeninazev', 'nazev zadatele', 'nazev subjektu', 'obchodni firma', 'jmeno zadatele']],
+      ['intakeApplicantBirthIc', ['dat nar ic', 'dat narozeni ic', 'datum narozeni ic', 'dic nebo ic', 'rodne cislo', 'identifikace osoby']],
+      ['intakeApplicantEmail', ['e mail', 'email', 'elektronicka posta']],
+      ['intakeApplicantPhone', ['telefon', 'mobilni telefon', 'mobil', 'tel cislo', 'kontakt telefon']],
+      ['intakeApplicantStreet', ['ulice trvala', 'ulice sidlo', 'sidlo ulice', 'trvala ulice', 'ulice zadatel', 'dodaci ulice']],
+      ['intakeApplicantHouseNo', ['cislo popisne trvala', 'popisne zadatel', 'domovni cislo popisne', 'cp popisne zadatel']],
+      ['intakeApplicantOrientNo', ['cislo orientacni trvala', 'orientacni zadatel', 'co orientacni zadatel']],
+      ['intakeApplicantPsc', ['psc zadatel', 'psc trvaleho', 'psc sidlo', 'postovni smerovaci cislo zadatel']],
+      ['intakeApplicantCity', ['obec zadatel', 'obec trvaleho', 'mesto zadatel', 'obec sidlo']],
+      ['intakeRealStreet', ['ulice realizace', 'mist realizace ulice', 'stavebni objekt ulice', 'ulice stavby']],
+      ['intakeRealHouseNo', ['cislo popisne realizace', 'popisne realizace', 'cp realizace']],
+      ['intakeRealOrientNo', ['cislo orientacni realizace', 'orientacni realizace', 'co realizace']],
+      ['intakeRealPsc', ['psc realizace', 'psc mista', 'psc stavby']],
+      ['intakeRealCity', ['obec realizace', 'mesto realizace', 'obec stavby']],
+      ['intakeRegion', ['kraj realizace', 'kraj mista', 'uzemni celek', 'statkraj']],
+      ['intakeCadastralCode', ['katastralni uzemi cislo', 'katastr cislo', 'ku cislo', 'cislo ku']],
+      ['intakeCadastralName', ['katastralni uzemi nazev', 'katastr nazev', 'ku nazev', 'nazev ku']],
+      ['intakeLvNumber', ['cislo listu vlastnictvi', 'list vlastnictvi', 'cislo lv', 'lv cislo']],
+      ['intakeParcelNumber', ['cislo parcely', 'parcelni cislo', 'parc cislo', 'cislo parcel']],
+      ['intakePropertyType', ['typ nemovitosti', 'druh nemovitosti']],
+      ['intakePeopleCount', ['pocet osob v objektu', 'pocet osob objekt']],
+      ['intakeHouseAge', ['stari domu', 'vek stavby', 'stari stavby']],
+      ['intakeUnitCount', ['pocet bytovych jednotek', 'bytove jednotky']],
+      ['intakeFloorArea', ['podlahova plocha', 'plocha podlah']],
+      ['intakeFloors', ['pocet podlazi', 'podlazi pocet']],
+      ['intakeProductType', ['typ produktu', 'druh produktu']],
+      ['intakeSubsidyProgram', ['dotacni program', 'program dotace', 'dotace program']]
+    ];
+    for (const [intakeKey, hints] of matchers) {
+      let bestVal = '';
+      let bestScore = 0;
+      let bestName = '';
+      for (const hint of hints) {
+        const nh = normalizeMatchKey(hint);
+        if (nh.length < 4) continue;
+        for (const [fname, fval] of entries) {
+          if (used.has(fname)) continue;
+          const nn = normalizeMatchKey(fname);
+          if (!nn.includes(nh)) continue;
+          const v = cleanExtract(String(fval));
+          if (!v) continue;
+          const score = nh.length * 1000 + nn.length;
+          if (score > bestScore) {
+            bestScore = score;
+            bestVal = v;
+            bestName = fname;
+          }
+        }
+      }
+      if (bestVal && bestName) {
+        used.add(bestName);
+        out[intakeKey] = bestVal;
+      }
+    }
+    return out;
   }
 
   function normalizeMatchKey(value) {
@@ -1267,8 +1377,8 @@ const state = {
     if ($('sourceFormParseInfo')) {
       const parsed = state.analysis?.sourceFormParsed;
       $('sourceFormParseInfo').innerHTML = parsed?.fieldCount
-        ? `Automaticky přeneseno <strong>${sanitize(parsed.fieldCount)}</strong> polí z textového PDF formuláře.`
-        : 'Automatický přenos funguje pro textové PDF formuláře.';
+        ? `Automaticky přeneseno <strong>${sanitize(parsed.fieldCount)}</strong> polí z PDF (vyplnitelná pole + textová vrstva).`
+        : 'Automatický přenos: vyplnitelná pole PDF, jinak textová vrstva (stejná šablona formuláře).';
     }
     if ($('sketchPreviewBox')) {
       $('sketchPreviewBox').innerHTML = state.images.sketch
@@ -1319,10 +1429,14 @@ const state = {
 
     try {
       status('Načítám zdrojový formulář a přenáším data do buněk…');
-      const structured = await extractPdfStructuredFromFile(file);
+      const buffer = await file.arrayBuffer();
+      const structured = await extractPdfStructuredFromBuffer(buffer);
+      const acroParsed = mapAcroFormToIntakeFields(await extractPdfAcroFormFieldMap(buffer));
       let parsed = parseSourceFormStructured(structured);
       const fallback = parseSourceFormText(structured.text);
-      parsed = postProcessParsedIntake(mergeParsedFields(parsed, fallback));
+      parsed = postProcessParsedIntake(
+        mergeParsedFields(acroParsed, mergeParsedFields(parsed, fallback))
+      );
       const fieldCount = applyParsedIntakeFields(parsed);
       state.analysis.sourceFormText = structured.text;
       state.analysis.sourceFormStructured = structured;

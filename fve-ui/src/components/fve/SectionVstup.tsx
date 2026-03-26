@@ -58,7 +58,7 @@ export function SectionVstup() {
               Není nahraný žádný zdrojový formulář.
             </div>
             <div id="sourceFormParseInfo" className="text-xs text-muted-foreground">
-              Automatický přenos funguje pro textové PDF formuláře.
+              U stejné šablony PDF: nejdřív vyplnitelná pole, jinak text z PDF.
             </div>
             <div
               id="sketchPreviewBox"
@@ -85,7 +85,8 @@ export function SectionVstup() {
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Po nahrání textového PDF se údaje z formuláře zkusí automaticky přenést do buněk.
+              Po nahrání PDF se údaje přenesou z polí formuláře (AcroForm) nebo z textové vrstvy — šablona je
+              pořád stejná, mění se jen vyplněné hodnoty.
             </p>
           </CardContent>
         </Card>
