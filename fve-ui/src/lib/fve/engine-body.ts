@@ -180,6 +180,87 @@ const state = {
       .trim();
   }
 
+  /**
+   * PDF text layer often glues field labels to values (e.g. "/Název: Jan Novák", "/IČ: 123" or dates).
+   * Strip known Czech form prefixes only at the start, repeatedly, so different PDFs still map cleanly.
+   */
+  function stripLeadingPdfFormLabels(value) {
+    let v = cleanExtract(value);
+    if (!v) return '';
+    const leadingPatterns = [
+      /^\/\s*Jméno\s+a\s+příjmení\s*\/\s*Název\s*:?\s*/i,
+      /^Jméno\s+a\s+příjmení\s*\/\s*Název\s*:?\s*/i,
+      /^\/\s*Jméno\s+a\s+příjmení\s*:?\s*/i,
+      /^\/\s*Název\s*:?\s*/i,
+      /^Název\s*:?\s*/i,
+      /^\/\s*Dat\.\s*nar\.?\s*\/\s*IČ\s*:?\s*/i,
+      /^Dat\.\s*nar\.?\s*\/\s*IČ\s*:?\s*/i,
+      /^Datum\s*narození\s*\/\s*IČ\s*:?\s*/i,
+      /^\/\s*IČ\s*:?\s*/i,
+      /^IČ\s*:?\s*/i,
+      /^\/\s*Dat\.\s*nar\.?\s*:?\s*/i,
+      /^Dat\.\s*nar\.?\s*:?\s*/i,
+      /^Datum\s*narození\s*:?\s*/i,
+      /^Rodné\s*číslo\s*:?\s*/i,
+      /^E-?\s*mail\s*:?\s*/i,
+      /^Telefon\s*:?\s*/i,
+      /^Tel\.?\s*:?\s*/i,
+      /^Mobil(?:ní\s*telefon)?\s*:?\s*/i,
+      /^Ulice\s*:?\s*/i,
+      /^Číslo\s*popisné\s*:?\s*/i,
+      /^Číslo\s*orientační\s*:?\s*/i,
+      /^PSČ\s*:?\s*/i,
+      /^Obec\s*:?\s*/i,
+      /^Kraj\s*:?\s*/i,
+      /^Katastrální\s*území\s*\(?číslo\)?\s*:?\s*/i,
+      /^Katastrální\s*území\s*\(?název\)?\s*:?\s*/i,
+      /^Číslo\s*parcely\s*:?\s*/i,
+      /^Číslo\s*listu\s*vlastnictví\s*:?\s*/i,
+      /^Typ\s*nemovitosti\s*:?\s*/i,
+      /^Typ\s*produktu\s*:?\s*/i,
+      /^Dotační\s*program\s*:?\s*/i
+    ];
+    for (let pass = 0; pass < 15; pass += 1) {
+      const before = v;
+      for (const re of leadingPatterns) {
+        const next = v.replace(re, '').trim();
+        if (next !== v) v = cleanExtract(next);
+      }
+      if (v === before) break;
+    }
+    return v;
+  }
+
+  function stripTrailingStreetHouseHint(value) {
+    let v = cleanExtract(value);
+    if (!v) return '';
+    return v
+      .replace(/\s+č\.\s*p\.?\s*$/i, '')
+      .replace(/\s+č\.\s*pop\.\s*$/i, '')
+      .replace(/\s+čp\s*$/i, '')
+      .trim();
+  }
+
+  function postProcessParsedIntake(parsed) {
+    const out = { ...(parsed || {}) };
+    for (const key of Object.keys(out)) {
+      if (!key.startsWith('intake')) continue;
+      let v = out[key];
+      if (v == null) continue;
+      v = String(v);
+      if (!v.trim()) continue;
+      v = stripLeadingPdfFormLabels(v);
+      if (key === 'intakeApplicantEmail') {
+        v = v.replace(/\s+/g, '');
+      }
+      if (key === 'intakeApplicantStreet' || key === 'intakeRealStreet') {
+        v = stripTrailingStreetHouseHint(v);
+      }
+      out[key] = cleanExtract(v);
+    }
+    return out;
+  }
+
   function getSection(text, start, end) {
     const re = new RegExp(labelPattern(start) + '\\s*([\\s\\S]*?)\\s*(?=' + labelPattern(end) + ')', 'i');
     const match = normalizeFormText(text).match(re);
@@ -1241,7 +1322,7 @@ const state = {
       const structured = await extractPdfStructuredFromFile(file);
       let parsed = parseSourceFormStructured(structured);
       const fallback = parseSourceFormText(structured.text);
-      parsed = mergeParsedFields(parsed, fallback);
+      parsed = postProcessParsedIntake(mergeParsedFields(parsed, fallback));
       const fieldCount = applyParsedIntakeFields(parsed);
       state.analysis.sourceFormText = structured.text;
       state.analysis.sourceFormStructured = structured;
