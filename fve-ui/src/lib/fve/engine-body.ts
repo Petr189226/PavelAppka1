@@ -1430,8 +1430,9 @@ const state = {
     try {
       status('Načítám zdrojový formulář a přenáším data do buněk…');
       const buffer = await file.arrayBuffer();
-      const structured = await extractPdfStructuredFromBuffer(buffer);
-      const acroParsed = mapAcroFormToIntakeFields(await extractPdfAcroFormFieldMap(buffer));
+      // PDF.js může při getDocument odpojit (detach) předaný ArrayBuffer — druhé použití stejné instance pak spadne.
+      const structured = await extractPdfStructuredFromBuffer(buffer.slice(0));
+      const acroParsed = mapAcroFormToIntakeFields(await extractPdfAcroFormFieldMap(buffer.slice(0)));
       let parsed = parseSourceFormStructured(structured);
       const fallback = parseSourceFormText(structured.text);
       parsed = postProcessParsedIntake(
