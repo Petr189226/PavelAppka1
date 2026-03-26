@@ -6,7 +6,7 @@ import { bootstrapEngine, setStatusHandler } from "@/lib/fve/engine-body";
 
 export default function App() {
   useEffect(() => {
-    setStatusHandler((text, ok) => {
+    setStatusHandler((text: string, ok: boolean) => {
       if (text && !ok) console.warn("[FVE]", text);
     });
     bootstrapEngine();
