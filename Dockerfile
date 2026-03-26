@@ -1,9 +1,9 @@
 # Static Vite/React app lives in fve-ui/ — Railpack fails on repo root without this file.
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY fve-ui/package.json ./fve-ui/
+COPY fve-ui/package.json fve-ui/package-lock.json ./fve-ui/
 WORKDIR /app/fve-ui
-RUN npm install
+RUN npm ci
 COPY fve-ui/ ./
 RUN npm run build
 
